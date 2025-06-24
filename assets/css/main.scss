@@ -4,3 +4,20 @@
 @import "moonwalk";
 @import "list";
 @import "syntax";
+
+
+.outputs-table {
+    width: 100%; /* Make the table take full width of its container */
+    table-layout: fixed; /* Important: this makes width percentages work reliably */
+  }
+  .outputs-table th:nth-child(1),
+  .outputs-table td:nth-child(1) {
+    width: 20%; /* Adjust as needed, e.g., 20% for the first column */
+    text-align: center; /* Original markdown had center alignment */
+  }
+  .outputs-table th:nth-child(2),
+  .outputs-table td:nth-child(2) {
+    width: 80%; /* Adjust as needed, e.g., 80% for the the second column */
+    word-wrap: break-word; /* Ensures long words break to the next line */
+    text-align: left; /* Original markdown had left alignment */
+  }
