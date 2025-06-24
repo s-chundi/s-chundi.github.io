@@ -6,7 +6,7 @@ tags: [Mechanistic Interpretability]
 
 Mechanistic Interpretability is the field of understanding how neural networks arrive at their outputs. Understanding language models is key to ensuring they are safe and aligned with human goals. There are many reasons LLMs are challenging to interpret. Internally, the patterns of activations of neurons cannot easily be correlated to certain behaviors. This is not intended to be an in depth research post. Instead I'm hoping to present some minimal code samples and interesting results for those hoping to get a peek at what mechanistic interpretability has to offer.
 
-## The Superposition Hypothesisq
+## The Superposition Hypothesis
 
 The Superposition Hypothesis is a common hypothesis for why LLM activations are so hard to understand. There are several orders of magnitude more concepts in the world than neurons in LLMs. Additionally, the concepts in the world are sparse; the word "pineapple" is in less than 0.1% of sentences, but still needs to be modeled by LLMs. Having a dedicated neuron for each concept is infeasible and unnecessary.
 
@@ -120,7 +120,7 @@ SAE training is finicky. Some of the latents may be dead (never fire) as a resul
 Ideally, we see latents that rarely fire, as they correspond to only a single feature of the input text.
 <img src="/images/mech-int/latent_10_sparse.png">
 
-We can clamp these features high above their max activations to get some interesting and weird responses. This took a bit of manual labor to find interesting latents, as some are dense and others are not activated by the prompt or don't really produce interesting outputs. These responses don't imply a causal relationship between clamped latents and the outputs we see. But my objective with this work was to implement some research and produce some funny or strange results, which I think I've done.
+We can boost these features high above their max activations to get some interesting and weird responses. This took a bit of manual labor to find interesting latents, as some are dense and others are not activated by the prompt or don't really produce interesting outputs. These responses don't imply a causal relationship between boosted latents and the outputs we see. But my objective with this work was to implement some research and produce some funny or strange results, which I think I've done.
 
 <table class="outputs-table">
   <thead>
@@ -161,6 +161,7 @@ We can clamp these features high above their max activations to get some interes
   </tbody>
 </table>
 
+Latent 10 could correspond to artists, and latent 29 seems to be related to psychological horror films. With latent 29 clamped high  even hallucinates a film, "Identity" by a well known director of psychological horror.
 
 ```
 from functools import partial
@@ -181,11 +182,8 @@ def steering_hook(
     Steers the model by returning a modified activations tensor, with some multiple of the steering vector added to all
     sequence positions.
     """
-    return activations + torch.clamp(
-        sae.W_dec[latent_idx] * max_activation * 10, 
-        min=sae.W_dec[latent_idx] * max_activation * 5
-    )
-    
+    return activations + sae.W_dec[latent_idx] * max_activation * 10
+
 def generate_with_steering(
     model: HookedSAETransformer,
     sae: SAE,
