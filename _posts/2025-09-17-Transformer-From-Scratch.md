@@ -18,7 +18,7 @@ I'm not going to walk through the full transformer architecture, as other posts 
 
 The strength of a language model is determined by how well it preserves context. The efficiency of a language model is determined by how well it compresses context. Transformers with full context attention are incredibly strong at modelling because the don't compress context at all. At each generation step, each token has access to every previous token. Consequently, they are not very efficient.
 
-Sliding window attention is a naive way to compress context by attending to only the most recent $K$ tokens. Note the below implementation allows full context attention as well as sliding window attention by adjusting the $window\_size$ argument.
+Sliding window attention is a naive way to compress context by attending to only the most recent $K$ tokens. Note the below implementation allows full context attention as well as sliding window attention by adjusting the window_size argument.
 
 ```
 class CustomTransformerBlock(nn.Module):
@@ -70,7 +70,7 @@ class CustomTransformerBlock(nn.Module):
 ```
 
 
-I set window size to 2000 (1/4 of the original context window). Some preliminary timing tests (shown below) show the custom block is roughly two times faster. The Pytorch implementation of is probably much more efficient and doesn't compute masked values, hence the nonlinear tradeoff.
+I set window size to 2000 (1/4 of the original context window). Some preliminary timing tests (see below) show the custom block is roughly two times faster. The Pytorch implementation of is probably much more efficient and doesn't compute masked values, hence the nonlinear tradeoff.
 
 <img src="/images/from-scratch/fullattn.png">
 <img src="/images/from-scratch/slidingattn.png">
