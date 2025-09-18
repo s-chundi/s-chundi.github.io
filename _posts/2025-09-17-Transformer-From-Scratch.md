@@ -77,8 +77,6 @@ I set window size to 2000 (1/4 of the original context window). Some preliminary
 
 I trained two transformers, each with 8 transformer blocks. In one, I alternate between sliding window attention and full attention, and in the other I only use full attention. The sliding window attention model outperforms the full attention model in both training time and test loss, which is probably a symptom of overfitting or needing better hyperparameters. The text corpus I used was Harry Potter and the Sorcerer's Stone.
 
-<img src="/images/from-scratch/testloss.png">
-
 ## Generations
 
 I also generate a few sequences from the models during validation to qualitatively check progress. The generations are not J.K. Rowling quality in the slightest, but they seem to be coherent english (up to a point). In future posts I will improve upon the quality and quantity of the training data, and set a higher bar for generation results than "somewhat english"
