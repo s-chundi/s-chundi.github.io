@@ -16,39 +16,53 @@ The full code for my implementation is [here](https://github.com/s-chundi/deepse
 
 ### The Residual Stream Tradeoff
 
-The residual stream offers a way to treat each layer as an incremental adjustment to the input embeddings. At earlier layers, these adjustments or processing steps can focus on part of speech or syntax, whereas in later layers the incremental adjustments can focus on long-range semantics. 
-
+The residual stream offers a way to treat each layer as an incremental adjustment to the input embeddings. At earlier layers, these adjustments or processing steps can focus on part of speech or syntax, and in later layers the incremental adjustments can focus on long-range semantics. 
 
 ##### Pre-norm residual connections
-```python
-def forward(self, hidden_states: torch.Tensor, ...) -> torch.Tensor:
-        residual = hidden_states
-        hidden_states = self.input_layernorm(hidden_states)
-        # Manipulation of hidden states via attention or mlp
-        hidden_states = residual + hidden_states
-```
+<div align="center">
+$$x = x + Norm(F(x))$$
+</div>
 
-$$x = x + Norm(layer(x))$$
-
-* The gradient will be $1 + (\text{small_number}) * \text{grad_layer}$, effectively handling the vanishing gradient problem
-* The output of a layer $n$ will be $1 + \Sum_{i}^{n} \text{small_change}$, meaning all layers look very similar
+* The gradient will be $1 + (\epsilon) * \text{gradient}$, effectively handling the vanishing gradient problem, where $\epsilon$ is a small number b/c of the nature of layer normalization.
+* The output of a layer $n$ will be $1 + \sum_{i=1}^{n} \epsilon$, meaning all layers look very similar
 * For stability purposes, this is the go-to for LLMs these days
 
 ##### Post-norm residual connections
+<div align="center">
 $$x = Norm(x + layer(x))$$
+</div>
 
 * The output of a layer is allowed to be very different than the input layer, adding feature diversity
-* The gradient will be $(\text{small_number}) * (1 + \text{grad_layer})$, re-introducing the vanishing gradient problem
+* The gradient will be $\epsilon * (1 + \text{gradient})$, re-introducing the vanishing gradient problem
 * This was used in the original transformers paper
 
 ### Enter Hyper Connections
 
 <img src="/images/MCH/diagram.png">
 
-This diagram offers a way to understand hyperconnections intuitively. Note we are able to expand the residual stream with minimal additional parameters. Let `K` be the residual stream "expansion" (set to 4 in our implementation). The weighted sum has shape `(K,)`, the mixing matrix has shape `(K, K)`, and the scaling vector has shape `(K,)`. As opposed to having shape `(D,)` for the residual stream, we now have shape `(K, D / K)`.
+This diagram offers a way to understand hyperconnections intuitively. Let $K$ be the residual stream "expansion". 
 
-TODO: Add static vs dynamic hyper connections
+| Feature | Shape | Initialization |
+|---------|-------|-----------------|
+| Weighted Sum Vector | $(K,)$ | one hot |
+| Scaling Vector | $(K,)$ | ones |
+| Mixing Matrix | $(K, K)$ | identity matrix |
 
+* Note we are able to expand the residual stream with minimal additional parameters.
+* As opposed to having shape $(D,)$ for the residual stream, it is now $(K, D / K)$.
+
+<details markdown="1">
+  <summary>That is only static hyper connections. We can also have dynamic hyper connections.</summary>
+
+Let $w$ be the matrix or vector for the weighted sum, mixing matrix, or scaling vector.
+During the forward pass, the following transformation is applied:
+<div align="center">
+$$w = s_{\alpha} \cdot \tanh{(\text{Linear}(w))} + w$$
+</div>
+where $s_{\alpha}$ is a learned scalar. This allows the model to adjust hyper connections based on the input.
+The paper also shows omitting the tanh function produces better results on some tasks. 
+
+</details>
 #### Sequential - Parallel Capabilities
 
 A transformer model typically acts as a sequential model
@@ -60,16 +74,20 @@ $$x_{n+1}​=x_{n}​+F(x_{n}​)$$
 A transformer model can also (kind of) act as a parallel model. For example on a translation task,
 * Layer 1 could extract POS info, and store this in indices 1 - 10 of the residual stream
 * Layer 2 could extract gender and store this in indices 11 - 20 of the residual stream
-* Layer 3 could extract tense info and store in indices 21 - 30 of the residual stream
+* ...
 * However this is sort of clunky b/c layer 2 has to understand and ignore the changes made by layer 1 to behave this way
-This capability was made explicity in some old school open source models, (e.g. GPT-J) which used layers like:
-$$x_{out}​=x_{in}​+Attn(x_{in}​)+MLP(x_{in})$$
 
+This capability was made explicity in some old school open source models, (e.g. GPT-J) which used layers like:
+<div align="center">
+$$x_{out}​=x_{in}​+Attn(x_{in}​)+MLP(x_{in})$$
+</div>
 With the widened residual stream offered by hyper connections, the model can choose between sequential and parallel workflows very easily.
+
+<img src="/images/MCH/Cosine_sim_layers_hyperconnections.png" style="width: 50%;">
 
 ##### Results
 
-<img src="/images/MCH/hyperconnection_loss_train.png"> 
+<img src="/images/MCH/hyperconnection_loss_train.png" style="width: 65%;"> 
 
 Loss curves for the OLMo model with and without hyper connections.
 
@@ -85,11 +103,11 @@ Each mixing matrix and scaling vector are unconstrained, allowing the model to a
 
 | Feature | Shape | Static Hyper Connection | Manifold Constraint Transformation |
 |---------|-------|-------------------------|-------------------------------------|
-| Weighted Sum Vector | `(K,)` | $w$ | $\sigma(w)$
-| Scaling Vector | `(K,)` | $s$ | $2\sigma(s)$ |
-| Mixing Matrix | `(K, K)` | $M$ | $\text{Sinkhorn-Knopp}(e^{M})$ |
+| Weighted Sum Vector | $(K,)$ | $w$ | $\sigma(w)$
+| Scaling Vector | $(K,)$ | $s$ | $2\sigma(s)$ |
+| Mixing Matrix | $(K, K)$ | $M$ | $\text{Sinkhorn-Knopp}(e^{M})$ |
 
-The Sinkhorn-Knopp algorithm is just iterative row and column normalization of the matrix.
+*The Sinkhorn-Knopp algorithm is just iterative row and column normalization of the matrix.*
 
 ##### Results
 
