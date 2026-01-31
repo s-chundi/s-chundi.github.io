@@ -138,7 +138,19 @@ exact_match,strict-match: 0.4109
 exact_match_stderr,strict-match: 0.0136
 exact_match,flexible-extract: 0.4109
 exact_match_stderr,flexible-extract: 0.0136
+```
 
+If we do a full SFT run, we get even worse results:
+
+```
+============================================================
+GSM8K Results  (num_fewshot = 5)
+============================================================
+alias: gsm8k
+exact_match,strict-match: 0.3624
+exact_match_stderr,strict-match: 0.0132
+exact_match,flexible-extract: 0.3639
+exact_match_stderr,flexible-extract: 0.0133
 ```
 ##### Vanilla Hyper Connections
 
