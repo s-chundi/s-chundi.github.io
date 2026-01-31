@@ -97,9 +97,12 @@ Loss curves for the OLMo model with and without hyper connections.
 
 <img src="/images/MCH/mhc_hc_baseling.png"> 
 
-Each mixing matrix and scaling vector are unconstrained, allowing the model to arbitrarily amplify signals within the residual stream. While hyper connections proved useful in smaller models, they. Note for the above experiment with 27B models, the hyper connection gradients fluctuate wildly.
+Each mixing matrix and scaling vector are unconstrained, allowing the model to arbitrarily amplify signals within the residual stream. While hyper connections proved useful in smaller models, they become unstable in larger models. 
+*Note for the above experiment with 27B models, the hyper connection gradients fluctuate wildly.*
 
-##### Implementation (Constraints)
+##### Constraints
+
+The solution is to constrain the parameters manipulating the residual stream, preventing explosion in signal.
 
 | Feature | Shape | Static Hyper Connection | Manifold Constraint Transformation |
 |---------|-------|-------------------------|-------------------------------------|
@@ -117,35 +120,52 @@ Benchmark results on a 27B model with and without manifold constrained hyper con
 
 ## Code
 
-We're using GSM-8k-CoT and Qwen3-0.6B
-The first thing we'll do is evaluate the initial model on GSM-8k using ElutherAI's lm-eval package.
-My code up to this point is checkpointed [here](https://github.com/s-chundi/deepseek_mhc/tree/c0bbe51e8409d3621c098184786a56228811c781)
+##### Baseline
 
-You can follow along by following the quickstart in the [README](https://github.com/s-chundi/deepseek_mhc/tree/c0bbe51e8409d3621c098184786a56228811c781/README.md) at this checkpoint.
+We're using GSM-8k and Qwen3-0.6B
+The first thing we'll do is evaluate the initial model on GSM-8k using ElutherAI's lm-eval package. We'll train the model on GSM-8k for 1 epoch and very low learning rate (`1e-6`) to get a baseline number.
 
-We've made some changes to the code in `src/model/modeling_mhc_q3.py`. The weighted sum and the scaling vector are both implemented, but they are set to a constant `[1.0, 0.0, 0.0, 0.0]`. This ensures only 1 "lane" of the residual stream is used, and acts as a sanity check that our minor adjustment to Qwen's structure doesn't break performance.
+My code up to this point is checkpointed [here](https://github.com/s-chundi/deepseek_mhc/blob/329a4e81805b273c0aee5ba71e93487ccfa2d3bb)
+
+You can follow along by following the quickstart in the [README](https://github.com/s-chundi/deepseek_mhc/blob/329a4e81805b273c0aee5ba71e93487ccfa2d3bb/README.md) at this checkpoint.
 
 ```
-# With num_fewshot = 0
 ============================================================
-GSM8K Results
-============================================================
-alias: gsm8k_cot
-exact_match,strict-match: 0.0417
-exact_match_stderr,strict-match: 0.0055
-exact_match,flexible-extract: 0.1630
-exact_match_stderr,flexible-extract: 0.0102
-
-============================================================
-GSM8K Results
+GSM8K Results (num_fewshot = 5)
 ============================================================
 alias: gsm8k
-exact_match,strict-match: 0.0000
-exact_match_stderr,strict-match: 0.0000
-exact_match,flexible-extract: 0.0948
-exact_match_stderr,flexible-extract: 0.0081
+exact_match,strict-match: 0.4109
+exact_match_stderr,strict-match: 0.0136
+exact_match,flexible-extract: 0.4109
+exact_match_stderr,flexible-extract: 0.0136
+
+```
+##### Vanilla Hyper Connections
+
+We now modify the model to use vanilla hyper connections. Follow along in the code [here](https://github.com/s-chundi/deepseek_mhc/tree/hyperconnections) .
+
+After SFT, we get some minor improvements on GSM-8k.
+
+```
+============================================================
+GSM8K Results (num_fewshot = 5)
+============================================================
+alias: gsm8k
+exact_match,strict-match: 0.4443
+exact_match_stderr,strict-match: 0.0137
+exact_match,flexible-extract: 0.4450
+exact_match_stderr,flexible-extract: 0.0137
 ```
 
-## Code
+Then we can do some post-training with GRPO
 
-To modify Qwen, we must modify the configuration and model definition. These were copied out of the source files and 
+```
+============================================================
+GSM8K Results (num_fewshot = 5)
+============================================================
+alias: gsm8k
+exact_match,strict-match: 0.4541
+exact_match_stderr,strict-match: 0.0137
+exact_match,flexible-extract: 0.4549
+exact_match_stderr,flexible-extract: 0.0137
+```
