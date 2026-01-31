@@ -37,11 +37,16 @@ li { margin: 0.4em 0; }
   padding: 4em 2em;
 }
 
-table, th, td {
+table {
   width: 100%;
   border: thin solid black;
   border-collapse: collapse;
+}
+th, td {
+  border: thin solid black;
   padding: 0.4em;
+  text-align: center;
+  vertical-align: middle;
 }
 
 div.highlighter-rouge pre code, pre code.highlighter-rouge {
@@ -187,7 +192,7 @@ p code, li code {
   background-color: var(--bg-secondary);
   padding: 0.2rem;
   color: var(--code-text);
-  font-weight: bold;
+  font-weight: normal;
 }
 .post-title {
   margin-bottom:-1.5rem;
