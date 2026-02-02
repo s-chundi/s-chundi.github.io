@@ -24,7 +24,7 @@ $$x = x + Norm(F(x))$$
 </div>
 
 * The gradient will be $1 + (\epsilon) * \text{gradient}$, effectively handling the vanishing gradient problem, where $\epsilon$ is a small number b/c of the nature of layer normalization.
-* The output of a layer $n$ will be $1 + \sum_{i=1}^{n} \epsilon$, meaning all layers look very similar
+* The output of a layer $n$ will be $1 + \sum_{i=1}^{n} \epsilon * F_i(x)$, meaning all layers look very similar
 * For stability purposes, this is the go-to for LLMs these days
 
 ##### Post-norm residual connections
@@ -44,12 +44,13 @@ This diagram offers a way to understand hyperconnections intuitively. Let $K$ be
 
 | Feature | Shape | Initialization |
 |---------|-------|-----------------|
-| Weighted Sum Vector | $(K,)$ | one hot |
+| Weighted Sum Vector | $(K,)$ | ones / K |
 | Scaling Vector | $(K,)$ | ones |
 | Mixing Matrix | $(K, K)$ | identity matrix |
 
 * Note we are able to expand the residual stream with minimal additional parameters.
 * As opposed to having shape $(D,)$ for the residual stream, it is now $(K, D / K)$.
+* Small random noise is added during initialization to prevent identical gradients.
 
 <details markdown="1">
   <summary>That is only static hyper connections. We can also have dynamic hyper connections.</summary>
@@ -81,7 +82,7 @@ This capability was made explicity in some old school open source models, (e.g. 
 <div align="center">
 $$x_{out}​=x_{in}​+Attn(x_{in}​)+MLP(x_{in})$$
 </div>
-With the widened residual stream offered by hyper connections, the model can choose between sequential and parallel workflows very easily.
+With the widened residual stream offered by hyper connections, the model can choose between sequential and parallel workflows very easily. We also see the model has greater variation between layers when using hyper connections.
 
 <img src="/images/MCH/Cosine_sim_layers_hyperconnections.png" style="width: 50%;">
 
@@ -125,59 +126,89 @@ Benchmark results on a 27B model with and without manifold constrained hyper con
 We're using GSM-8k and Qwen3-0.6B
 The first thing we'll do is evaluate the initial model on GSM-8k using ElutherAI's lm-eval package. We'll train the model on GSM-8k for 1 epoch and very low learning rate (`1e-6`) to get a baseline number.
 
-My code up to this point is checkpointed [here](https://github.com/s-chundi/deepseek_mhc/blob/329a4e81805b273c0aee5ba71e93487ccfa2d3bb)
+For the baseline training, see the [baseline-train](https://github.com/s-chundi/deepseek_mhc/tree/baseline-train) branch.
 
 You can follow along by following the quickstart in the [README](https://github.com/s-chundi/deepseek_mhc/blob/329a4e81805b273c0aee5ba71e93487ccfa2d3bb/README.md) at this checkpoint.
+It is possible to take the model definition and configuration files of huggingface models, copy them into a project directory and point the transformers library to these files.
 
-```
-============================================================
-GSM8K Results (num_fewshot = 5)
-============================================================
-alias: gsm8k
-exact_match,strict-match: 0.4109
-exact_match_stderr,strict-match: 0.0136
-exact_match,flexible-extract: 0.4109
-exact_match_stderr,flexible-extract: 0.0136
-```
-
-If we do a full SFT run, we get even worse results:
-
-```
-============================================================
-GSM8K Results  (num_fewshot = 5)
-============================================================
-alias: gsm8k
-exact_match,strict-match: 0.3624
-exact_match_stderr,strict-match: 0.0132
-exact_match,flexible-extract: 0.3639
-exact_match_stderr,flexible-extract: 0.0133
-```
 ##### Vanilla Hyper Connections
 
 We now modify the model to use vanilla hyper connections. Follow along in the code [here](https://github.com/s-chundi/deepseek_mhc/tree/hyperconnections) .
 
-After SFT, we get some minor improvements on GSM-8k.
+```python
+hidden_states = torch.einsum(
+                    "bksd,k->bsd",
+                    hidden_states,
+                    self.residual_stream_weights_attn
+                )
+# layernorm and attention 
+hidden_states = torch.einsum(
+                    "bsd,k->bksd",
+                    hidden_states,
+                    self.residual_stream_scaling_attn
+                )
+                residual = torch.einsum(
+                    "bksd,kl->blsd",
+                    residual,
+                    self.residual_stream_mixing_attn
+                )
+                hidden_states = residual + hidden_states
+                residual = hidden_states
+```
 
-```
-============================================================
-GSM8K Results (num_fewshot = 5)
-============================================================
-alias: gsm8k
-exact_match,strict-match: 0.4443
-exact_match_stderr,strict-match: 0.0137
-exact_match,flexible-extract: 0.4450
-exact_match_stderr,flexible-extract: 0.0137
+For training setup and hyperparameters, see the [config.yaml](https://github.com/s-chundi/deepseek_mhc/blob/60622dcf70d1bf83788e3eda78336a203d3bfca7/src/model/config.yaml) for the branches `manifold-hyperconnections`, `hyperconnections` and `baseline-train`.
+
+##### Manifold Constrained Hyper Connections
+With some simple modifications, we can convert the model to manifold constrained hyper connections. 
+```python
+def sinkhorn_knopp(self, x):
+    x = torch.exp(x)
+    for _ in range(5):
+        x = x / x.sum(dim=0, keepdim=True)
+        x = x / x.sum(dim=1, keepdim=True)
+        
+    return x
+
+def forward(
+    self,
+    hidden_states: torch.Tensor,
+    ...
+) -> torch.Tensor:
+    residual = hidden_states
+    hidden_states = torch.einsum(
+        "bksd,k->bsd",
+        hidden_states,
+        torch.sigmoid(self.residual_stream_weights_attn) # Notice sigmoid normalization
+    )
+    # layernorm and attention 
+    hidden_states = torch.einsum(
+        "bsd,k->bksd",
+        hidden_states,
+        torch.sigmoid(self.residual_stream_scaling_attn) * 2 # Again sigmoid normalization * 2
+    )
+    residual = torch.einsum(
+        "bksd,kl->blsd",
+        residual,
+        self.sinkhorn_knopp(self.residual_stream_mixing_attn) # Sinkhorn-Knopp matrix normalization
+    )
+    hidden_states = residual + hidden_states
 ```
 
-Then we can do some post-training with GRPO
+## Final Results
 
-```
-============================================================
-GSM8K Results (num_fewshot = 5)
-============================================================
-alias: gsm8k
-exact_match,strict-match: 0.4541
-exact_match_stderr,strict-match: 0.0137
-exact_match,flexible-extract: 0.4549
-exact_match_stderr,flexible-extract: 0.0137
-```
+| Model  | gsm8K Score | Stderr |
+|-------|-------|-------|
+| Baseline | 0.4193 | 0.0136 |
+| Vanilla Hyperconnections | **0.4496** | 0.0137 |
+| Manifold Hyperconnections | 0.4147 | 0.0136 |
+
+
+## Limitations
+In order to use the original Qwen weights, we had to increase the size of the residual stream. It's possible that it was merely the extra computation that gave a boost in performance. In the original implementation, the residual stream footprint is unchanged (merely reshaped from $(D,)$ to $(K, D / K)$).
+
+For training the baseline model, I did a grid search of hyperparameters, but it could be the case that better hyperparameters would have shown stronger performance.
+
+## Conclusion
+
+It's nice that we see a small improvement on gsm8K using hyperconnections. This aligns with the MCH paper that the manifold constraint is only effective for larger, deeper models.
+
