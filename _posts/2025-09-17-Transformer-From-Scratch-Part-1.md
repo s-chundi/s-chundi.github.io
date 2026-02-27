@@ -128,11 +128,15 @@ Note, we use the check `ctx.needs_input_grad` in case some layers are frozen in 
 
 We can train our model and see if the generations are coherent.
 
-Model Output:
+**Model Input:**
 ```
-{prompt} help us navigate or connect to the internet. Each type plays a unique role in helping us learn more about our world and make better decisions here on Earth.
+... each step and how it helps achieve the desired outcome, inluding key tips and guidelines. Ensure clarity and practicality, allowing readers to easily follow and apply the instructions. Do not use images.  Title: How to Be an Exotic Dancer
 
-In summary, satellites use physics principles to snap breathtaking images of the Earth from outer space. By understanding how these fascinating machines work, we can appreciate just how powerful technology can be in expanding our knowledge and improving life on our amazing planet!
+Exotic dancing is a form of dance that involves performing sensual moves in front of an audience, often in a nightclub or strip club setting. This guide will provide you with comprehensive steps on how to become an exotic dancer, as well as important considerations and safety measures. Please note that this career requires physical stamina, self-confidence,
+```
+**Output:**
+```
+navigating the importance of the power and maintaining good contact with the magic behind this chapter, including those with friends but they're going to improve social cohesion
 ```
 
-Looks like english to me!
+Looks like english but pretty semantically rambling. I trained on a small subset of the dataset and didn't train for too many epochs, hence the poor generation quality. I'll circle back to improving generations in Part 2.
