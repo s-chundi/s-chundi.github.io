@@ -10,6 +10,9 @@ tags: [Transformer]
   We're continuing our implementation of a transformer from scratch. The transformer itself is quite basic, but computing the backwards gradients is a bit more involved.
 </details>
 
+Previous posts:
+- [Part 1: SILU, Linear and RMSNorm]({% post_url 2025-09-17-Transformer-From-Scratch-Part-1 %})
+
 The full code for my implementation is [here](https://github.com/s-chundi/from_scratch)
 
 The standard for a successful implementation in this particular post will be "semi-coherent outputs from the model". We're training/testing with a subset of the cosmopedia_v2 dataset.
