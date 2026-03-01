@@ -124,9 +124,14 @@ class LinearFunction(torch.autograd.Function):
 
 Note, we use the check `ctx.needs_input_grad` in case some layers are frozen in the future.
 
-### Sanity Check
+### Sanity Check and Loss Curves
 
-We can train our model and see if the generations are coherent.
+We're getting some overfitting on our very small portion of cosmopedia_v2, which is a good sign.
+
+<img src="/images/from-scratch/train_loss.png">
+<img src="/images/from-scratch/test_loss.png">
+
+At a test loss of ~5.3 (perplexity of ~200), the model performance is expected to be interpretable but pretty bad:
 
 **Model Input:**
 ```
