@@ -29,13 +29,13 @@ During the attention step, we produce a key, query, and value matrix with linear
 * Key vectors indicate "This token should be received later by tokens with certain properties."
 * Value vectors store the any of the current token's properties that should be received by other tokens.
 
-<details>
+<details markdown="1">
   <summary>Side Note on Attention Circuits</summary>
-  
+
   The attention equation $$\text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V$$ can be interpreted as two circuits working together.
   * The QK circuit computes what items to pay attention to. The composition of linear heads $W_Q W_K$ determines how different inputs get routed / blended. However, it does not directly manipulate the embedding vectors.
   * The OV circuit manipulates embedding vectors directly. The composition of $W_V$ and the mlp after the attention step modifies embedding vectors for the next layer.
-  * A more detailed explanation is given in the [transformers circuits thread](https://transformer-circuits.pub/)
+  * A more detailed explanation is given in the [transformers circuits thread](https://transformer-circuits.pub/).
 </details>
 
 Key and value vectors only need to be computed once during auto-regressive generation, as they are only dependent on tokens and layers that come before them. KV caching is the process of storing key and value vectors during generation to avoid recomputation and allow for more efficient inference.
