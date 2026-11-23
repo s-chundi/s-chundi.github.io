@@ -59,7 +59,7 @@ bash {"command": "bcp_search 'award launched 2011'"}
 In pseudocode:
 ```
 ctx_file = ctx_file + turn_tokens + optional_ctx_edit_confirmation
-new_ctx = system_prompt + tool_skill_ctx + ctx_file
+new_ctx = translate_to_chat_template(system_prompt + tool_skill_ctx + ctx_file)
 ```
 
 If the ctx file was edited, the `optional_ctx_edit_confirmation` might look like `[LIVE_CTX_MAIN.txt: edit applied — context ~24100->9800 tokens, 14 turns]`. An edit that modifies the ctx file might look like:
